@@ -1,0 +1,3 @@
+[submodule "bevy_sequence"]
+	path = bevy_sequence
+	url = https://github.com/corvusprudens/bevy_sequence
