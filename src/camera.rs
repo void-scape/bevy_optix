@@ -1,7 +1,6 @@
 use bevy::ecs::component::ComponentId;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
-use bevy_sequence::prelude::*;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, Component)]
@@ -20,12 +19,12 @@ impl Plugin for CameraPlugin {
             PostUpdate,
             (
                 (
-                    bind_to_dyn_anchor,
-                    unbind_dyn_anchor,
+                    crate::anchor::bind_to_dyn_anchor,
+                    crate::anchor::unbind_dyn_anchor,
                     camera_binded,
                     camera_move_to,
                 ),
-                anchor,
+                crate::anchor::anchor,
             )
                 .chain()
                 .before(TransformSystem::TransformPropagate)
@@ -34,7 +33,10 @@ impl Plugin for CameraPlugin {
     }
 }
 
-#[allow(unused)]
+#[cfg(feature = "sequence")]
+use bevy_sequence::prelude::*;
+
+#[cfg(feature = "sequence")]
 pub trait CameraCurveFragment<D, C>: Sized
 where
     D: Threaded,
@@ -82,6 +84,7 @@ where
     ) -> impl IntoFragment<D, C>;
 }
 
+#[cfg(feature = "sequence")]
 impl<D, C, T> CameraCurveFragment<D, C> for T
 where
     Self: IntoFragment<D, C>,
@@ -188,20 +191,6 @@ where
     }
 }
 
-enum Domain {
-    Entity { start: Vec3, end: Entity },
-    Positions { start: Vec3, end: Vec3 },
-}
-
-impl Domain {
-    pub fn target(&self) -> Option<Entity> {
-        match self {
-            Self::Entity { end, .. } => Some(*end),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Component)]
 #[component(on_insert = on_insert_moveto)]
 pub struct MoveTo {
@@ -242,6 +231,20 @@ impl MoveTo {
 
     pub fn complete(&self) -> bool {
         self.timer.finished()
+    }
+}
+
+enum Domain {
+    Entity { start: Vec3, end: Entity },
+    Positions { start: Vec3, end: Vec3 },
+}
+
+impl Domain {
+    pub fn target(&self) -> Option<Entity> {
+        match self {
+            Self::Entity { end, .. } => Some(*end),
+            _ => None,
+        }
     }
 }
 

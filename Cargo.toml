@@ -5,4 +5,7 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.15"
-bevy_seqence = { path = "evy_seqence" }
+bevy_sequence = { path = "bevy_sequence", optional = true }
+
+[features]
+sequence = ["dep:bevy_sequence"]

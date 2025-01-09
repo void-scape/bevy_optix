@@ -3,20 +3,30 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 /// Position which the [`MainCamera`] will snap to when a single instance exists.
-#[derive(Debug, Clone, Copy, PartialEq, Component)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Component)]
+#[require(Transform)]
 pub struct CameraAnchor;
 
 /// Position which the [`MainCamera`] will move to when an [`AnchorTarget`] enters the anchor's
 /// translation and `radius`.
 #[derive(Debug, Clone, Copy, PartialEq, Component)]
+#[require(Transform)]
 pub struct DynamicCameraAnchor {
     radius: f32,
+    speed: f32,
+}
+
+impl DynamicCameraAnchor {
+    pub fn new(radius: f32, speed: f32) -> Self {
+        Self { radius, speed }
+    }
 }
 
 /// Marks an entity as a valid target for triggering a [`DynamicCameraAnchor`] binding.
 ///
 /// Only one can exist at any given time.
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Default, Clone, Copy, Component)]
+#[require(Transform)]
 pub struct AnchorTarget;
 
 /// A component placed into the [`MainCamera`] which points to the entity currently dynamically
@@ -28,13 +38,10 @@ pub(crate) fn anchor(
     camera: Option<Single<&mut Transform, With<MainCamera>>>,
     anchor: Query<&Transform, (With<CameraAnchor>, Without<MainCamera>)>,
 ) {
-    match anchor.get_single() {
-        Ok(t) => {
-            if let Some(mut camera) = camera {
-                camera.translation = t.translation;
-            }
+    if let Ok(t) = anchor.get_single() {
+        if let Some(mut camera) = camera {
+            camera.translation = t.translation;
         }
-        Err(e) => warn_once!("could not anchor camera: {e}"),
     }
 }
 

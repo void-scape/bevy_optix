@@ -882,6 +882,7 @@ name = "bevy_pixel_gfx"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_sequence",
 ]
 
 [[package]]
@@ -1002,6 +1003,21 @@ dependencies = [
  "derive_more",
  "serde",
  "uuid",
+]
+
+[[package]]
+name = "bevy_sequence"
+version = "0.1.0"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_hierarchy",
+ "bevy_log",
+ "bevy_reflect",
+ "bevy_time",
+ "bevy_utils",
+ "rand",
+ "serde",
 ]
 
 [[package]]

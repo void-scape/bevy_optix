@@ -16,10 +16,16 @@ use bevy::{
 pub const HIGH_RES_LAYER: RenderLayers = RenderLayers::layer(1);
 
 /// Determines the resolution of the [`MainCamera`].
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Clone, Copy, Resource)]
 pub struct CanvasDimensions {
     pub width: u32,
     pub height: u32,
+}
+
+impl CanvasDimensions {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
 }
 
 /// Captures the [`HIGH_RES_LAYER`], including the [`Canvas`] texture generated from the
@@ -38,10 +44,10 @@ pub struct PixelPerfectPlugin(pub CanvasDimensions);
 
 impl Plugin for PixelPerfectPlugin {
     fn build(&self, app: &mut App) {
-        setup_camera(app.world_mut(), self.0);
+        setup_camera(app.world_mut());
         app.insert_resource(self.0)
             .insert_resource(AlignCanvasToCamera(true))
-            .add_systems(Update, fit_canvas)
+            .add_systems(Update, (fit_canvas, resize_canvas))
             .add_systems(
                 PostUpdate,
                 align_canvas_to_camera
@@ -61,50 +67,25 @@ impl Plugin for PixelPerfectPlugin {
 #[derive(Component)]
 struct Canvas;
 
-fn setup_camera(world: &mut World, dimensions: CanvasDimensions) {
-    let canvas_size = Extent3d {
-        width: dimensions.width,
-        height: dimensions.height,
-        ..default()
-    };
-
-    let mut canvas = Image {
-        texture_descriptor: TextureDescriptor {
-            label: None,
-            size: canvas_size,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Bgra8UnormSrgb,
-            mip_level_count: 1,
-            sample_count: 1,
-            usage: TextureUsages::TEXTURE_BINDING
-                | TextureUsages::COPY_DST
-                | TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        },
-        sampler: bevy::image::ImageSampler::Descriptor(ImageSamplerDescriptor::nearest()),
-        ..default()
-    };
-
-    canvas.resize(canvas_size);
-    let image_handle = world.add_asset(canvas);
-
+/// Inserting the camera within the app is necessary so that
+/// [`crate::post_processing::PostProcessCommand`] can query for the main camera on startup.
+fn setup_camera(world: &mut World) {
     world.commands().spawn((
         Camera2d,
+        // texture is deffered to the first time `resize_canvas` runs.
         Camera {
             hdr: true,
             order: -1,
-            target: RenderTarget::Image(image_handle.clone()),
             ..Default::default()
         },
         Tonemapping::TonyMcMapface,
         MainCamera,
         Msaa::Off,
-        dimensions,
     ));
 
     world
         .commands()
-        .spawn((Sprite::from_image(image_handle), Canvas, HIGH_RES_LAYER));
+        .spawn((Sprite::default(), Canvas, HIGH_RES_LAYER));
 
     world.commands().spawn((
         Camera2d,
@@ -119,7 +100,7 @@ fn setup_camera(world: &mut World, dimensions: CanvasDimensions) {
 }
 
 fn fit_canvas(
-    dimensions: Single<&CanvasDimensions, With<MainCamera>>,
+    dimensions: Res<CanvasDimensions>,
     mut resize_events: EventReader<WindowResized>,
     mut projection: Single<&mut OrthographicProjection, With<OuterCamera>>,
 ) {
@@ -131,12 +112,17 @@ fn fit_canvas(
 }
 
 fn resize_canvas(
-    dimensions: Single<&CanvasDimensions, (With<MainCamera>, Changed<CanvasDimensions>)>,
+    dimensions: Res<CanvasDimensions>,
     mut canvas: Single<&mut Sprite, With<Canvas>>,
     window: Single<&Window>,
     mut projection: Single<&mut OrthographicProjection, With<OuterCamera>>,
     mut images: ResMut<Assets<Image>>,
+    mut camera: Single<&mut Camera, With<MainCamera>>,
 ) {
+    if !dimensions.is_changed() {
+        return;
+    }
+
     let canvas_size = Extent3d {
         width: dimensions.width,
         height: dimensions.height,
@@ -161,7 +147,9 @@ fn resize_canvas(
     };
 
     new_canvas.resize(canvas_size);
-    canvas.image = images.add(new_canvas);
+    let handle = images.add(new_canvas);
+    canvas.image = handle.clone();
+    camera.target = RenderTarget::Image(handle);
 
     let h_scale = window.resolution.width() / dimensions.width as f32;
     let v_scale = window.resolution.height() / dimensions.height as f32;
