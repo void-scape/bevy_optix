@@ -9,27 +9,37 @@ pub struct MainCamera;
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum CameraSystem {
     UpdateCamera,
+    SnapToGrid,
 }
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            PostUpdate,
-            (
+        app.add_systems(First, release_snap)
+            .add_systems(
+                PostUpdate,
                 (
-                    crate::anchor::bind_to_dyn_anchor,
-                    crate::anchor::unbind_dyn_anchor,
-                    camera_binded,
-                    camera_move_to,
+                    (
+                        (
+                            crate::anchor::bind_to_dyn_anchor,
+                            crate::anchor::unbind_dyn_anchor,
+                            camera_binded,
+                            camera_move_to,
+                        ),
+                        crate::anchor::anchor,
+                    )
+                        .chain()
+                        .before(TransformSystem::TransformPropagate)
+                        .in_set(CameraSystem::UpdateCamera),
+                    snap.before(TransformSystem::TransformPropagate)
+                        .in_set(CameraSystem::SnapToGrid),
                 ),
-                crate::anchor::anchor,
             )
-                .chain()
-                .before(TransformSystem::TransformPropagate)
-                .in_set(CameraSystem::UpdateCamera),
-        );
+            .configure_sets(
+                PostUpdate,
+                CameraSystem::UpdateCamera.before(CameraSystem::SnapToGrid),
+            );
     }
 }
 
@@ -326,5 +336,31 @@ fn camera_binded(
         } else {
             warn_once!("Camera binded to entity with no transform");
         }
+    }
+}
+
+#[derive(Component)]
+struct SubPixelPos(Vec3);
+
+fn snap(
+    mut commands: Commands,
+    camera: Option<Single<(Entity, &mut Transform), With<MainCamera>>>,
+) {
+    if let Some((entity, mut transform)) = camera.map(|c| c.into_inner()) {
+        let rounded = transform.translation.round();
+        commands
+            .entity(entity)
+            .insert(SubPixelPos(transform.translation));
+        transform.translation = rounded;
+    }
+}
+
+fn release_snap(
+    mut commands: Commands,
+    camera: Option<Single<(Entity, &mut Transform, &SubPixelPos), With<MainCamera>>>,
+) {
+    if let Some((entity, mut transform, sub_pixel)) = camera.map(|c| c.into_inner()) {
+        transform.translation = sub_pixel.0;
+        commands.entity(entity).remove::<SubPixelPos>();
     }
 }
