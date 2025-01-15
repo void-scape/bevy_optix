@@ -7,6 +7,7 @@ pub mod anchor;
 pub mod camera;
 pub mod pixel_perfect;
 pub mod post_processing;
+pub mod screen_shake;
 pub mod zorder;
 
 pub struct PixelGfxPlugin(pub CanvasDimensions);
@@ -17,6 +18,7 @@ impl Plugin for PixelGfxPlugin {
             camera::CameraPlugin,
             zorder::ZOrderPlugin,
             pixel_perfect::PixelPerfectPlugin(self.0),
+            screen_shake::ScreenShakePlugin,
         ));
     }
 }
