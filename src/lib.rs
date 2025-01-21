@@ -5,6 +5,7 @@ use pixel_perfect::CanvasDimensions;
 
 pub mod anchor;
 pub mod camera;
+pub mod glitch;
 pub mod pixel_perfect;
 pub mod post_processing;
 pub mod screen_shake;
@@ -18,6 +19,7 @@ impl Plugin for PixelGfxPlugin {
             camera::CameraPlugin,
             zorder::ZOrderPlugin,
             pixel_perfect::PixelPerfectPlugin(self.0),
+            glitch::GlitchPlugin,
             screen_shake::ScreenShakePlugin,
         ));
     }

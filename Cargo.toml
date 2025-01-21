@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 bevy = "0.15"
 bevy_sequence = { path = "bevy_sequence", optional = true }
+bevy_tween = "0.7.0"
 rand = "0.8.5"
 
 [features]

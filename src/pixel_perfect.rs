@@ -1,4 +1,5 @@
 use super::camera::{CameraSystem, MainCamera};
+use crate::glitch::{Glitch, GlitchUniform};
 use bevy::{
     core_pipeline::tonemapping::Tonemapping,
     image::ImageSamplerDescriptor,
@@ -44,7 +45,7 @@ pub struct PixelPerfectPlugin(pub CanvasDimensions);
 
 impl Plugin for PixelPerfectPlugin {
     fn build(&self, app: &mut App) {
-        setup_camera(app.world_mut());
+        setup_camera(app.world_mut(), &self.0);
         app.insert_resource(self.0)
             .insert_resource(AlignCanvasToCamera(true))
             .add_systems(Update, (fit_canvas, resize_canvas))
@@ -65,11 +66,11 @@ impl Plugin for PixelPerfectPlugin {
 }
 
 #[derive(Component)]
-struct Canvas;
+pub struct Canvas;
 
 /// Inserting the camera within the app is necessary so that
 /// [`crate::post_processing::PostProcessCommand`] can query for the main camera on startup.
-fn setup_camera(world: &mut World) {
+fn setup_camera(world: &mut World, dimensions: &CanvasDimensions) {
     world.commands().spawn((
         Camera2d,
         // texture is deffered to the first time `resize_canvas` runs.
@@ -83,9 +84,13 @@ fn setup_camera(world: &mut World) {
         Msaa::Off,
     ));
 
+    let mesh = world.add_asset(Rectangle::new(
+        dimensions.width as f32,
+        dimensions.height as f32,
+    ));
     world
         .commands()
-        .spawn((Sprite::default(), Canvas, HIGH_RES_LAYER));
+        .spawn((Mesh2d(mesh), Canvas, HIGH_RES_LAYER));
 
     world.commands().spawn((
         Camera2d,
@@ -112,12 +117,14 @@ fn fit_canvas(
 }
 
 fn resize_canvas(
+    mut commands: Commands,
     dimensions: Res<CanvasDimensions>,
-    mut canvas: Single<&mut Sprite, With<Canvas>>,
+    mut canvas: Single<Entity, With<Canvas>>,
     window: Single<&Window>,
     mut projection: Single<&mut OrthographicProjection, With<OuterCamera>>,
     mut images: ResMut<Assets<Image>>,
     mut camera: Single<&mut Camera, With<MainCamera>>,
+    mut glitch: ResMut<Assets<Glitch>>,
 ) {
     if !dimensions.is_changed() {
         return;
@@ -148,7 +155,12 @@ fn resize_canvas(
 
     new_canvas.resize(canvas_size);
     let handle = images.add(new_canvas);
-    canvas.image = handle.clone();
+
+    let glitch = glitch.add(Glitch::new(
+        handle.clone(),
+        GlitchUniform::from_intensity(0.),
+    ));
+    commands.entity(*canvas).insert(MeshMaterial2d(glitch));
     camera.target = RenderTarget::Image(handle);
 
     let h_scale = window.resolution.width() / dimensions.width as f32;
