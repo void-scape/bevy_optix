@@ -12,9 +12,9 @@ pub enum CameraSystem {
     SnapToGrid,
 }
 
-pub struct CameraPlugin;
+pub struct CameraAnimationPlugin;
 
-impl Plugin for CameraPlugin {
+impl Plugin for CameraAnimationPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(First, release_snap)
             .add_systems(
