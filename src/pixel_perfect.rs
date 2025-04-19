@@ -1,5 +1,4 @@
 use super::camera::{CameraSystem, MainCamera};
-use crate::glitch::{Glitch, GlitchUniform};
 use bevy::{
     core_pipeline::tonemapping::Tonemapping,
     image::ImageSamplerDescriptor,
@@ -117,14 +116,11 @@ fn fit_canvas(
 }
 
 fn resize_canvas(
-    mut commands: Commands,
     dimensions: Res<CanvasDimensions>,
-    mut canvas: Single<Entity, With<Canvas>>,
     window: Single<&Window>,
     mut projection: Single<&mut OrthographicProjection, With<OuterCamera>>,
     mut images: ResMut<Assets<Image>>,
     mut camera: Single<&mut Camera, With<MainCamera>>,
-    mut glitch: ResMut<Assets<Glitch>>,
 ) {
     if !dimensions.is_changed() {
         return;
@@ -155,12 +151,6 @@ fn resize_canvas(
 
     new_canvas.resize(canvas_size);
     let handle = images.add(new_canvas);
-
-    let glitch = glitch.add(Glitch::new(
-        handle.clone(),
-        GlitchUniform::from_intensity(0.),
-    ));
-    commands.entity(*canvas).insert(MeshMaterial2d(glitch));
     camera.target = RenderTarget::Image(handle);
 
     let h_scale = window.resolution.width() / dimensions.width as f32;

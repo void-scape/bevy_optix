@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 bevy = "0.15"
 bevy_sequence = { git = "https://github.com/CorvusPrudens/bevy_sequence.git", optional = true }
-bevy_tween = "0.7.0"
-rand = "0.8.5"
+bevy_tween = "0.7"
+rand = "0.8"
 
 [features]
 sequence = ["dep:bevy_sequence"]
