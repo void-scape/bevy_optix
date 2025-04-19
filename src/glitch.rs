@@ -1,11 +1,14 @@
 use crate::pixel_perfect::Canvas;
 use bevy::{
+    asset::load_internal_asset,
     ecs::query::QuerySingleError,
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     sprite::{Material2d, Material2dPlugin},
 };
 use bevy_tween::{component_tween_system, prelude::Interpolator, BevyTweenRegisterSystems};
+
+pub const GLITCH_SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(0x19A72E656);
 
 pub struct GlitchPlugin;
 
@@ -18,6 +21,13 @@ impl Plugin for GlitchPlugin {
                 commands.spawn(GlitchIntensity::default());
             })
             .add_systems(Update, tween_glitch);
+
+        load_internal_asset!(
+            app,
+            GLITCH_SHADER_HANDLE,
+            "shaders/glitch.wgsl",
+            Shader::from_wgsl
+        );
     }
 }
 
@@ -69,7 +79,6 @@ impl Interpolator for TweenGlitch {
 }
 
 fn tween_glitch(
-    mut commands: Commands,
     glitch_query: Query<&GlitchIntensity>,
     canvas: Option<Single<&MeshMaterial2d<Glitch>, With<Canvas>>>,
     mut glitches: ResMut<Assets<Glitch>>,
@@ -161,6 +170,6 @@ impl Default for GlitchUniform {
 
 impl Material2d for Glitch {
     fn fragment_shader() -> bevy::render::render_resource::ShaderRef {
-        "shaders/glitch.wgsl".into()
+        GLITCH_SHADER_HANDLE.into()
     }
 }

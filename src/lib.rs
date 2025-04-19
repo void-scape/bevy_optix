@@ -17,10 +17,7 @@ impl Plugin for PixelGfxPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             camera::CameraPlugin,
-            zorder::ZOrderPlugin,
             pixel_perfect::PixelPerfectPlugin(self.0),
-            glitch::GlitchPlugin,
-            screen_shake::ScreenShakePlugin,
         ));
     }
 }
