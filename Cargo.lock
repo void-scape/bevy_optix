@@ -1010,6 +1010,7 @@ dependencies = [
 [[package]]
 name = "bevy_sequence"
 version = "0.1.0"
+source = "git+https://github.com/CorvusPrudens/bevy_sequence.git#bc2f3e832cdd436af23803735853006218559afa"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
