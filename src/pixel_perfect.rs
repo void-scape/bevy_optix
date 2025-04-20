@@ -1,3 +1,5 @@
+use crate::camera::CameraSystem;
+
 use super::camera::MainCamera;
 use bevy::{
     core_pipeline::tonemapping::Tonemapping,
@@ -41,6 +43,21 @@ pub struct OuterCamera;
 #[derive(Debug, Resource)]
 pub struct AlignCanvasToCamera;
 
+/// Determines what will be scaled in order for the canvas to fill the screen.
+#[derive(Debug, Resource)]
+pub enum Scaling {
+    /// Scales the mesh canvas.
+    ///
+    /// Violates position and size cohesion between high res and low res layers.
+    /// Prevents resolution scaling of high res layers.
+    Canvas,
+    /// Scales the camera projection.
+    ///
+    /// Retains position and size cohesion between res layers.
+    /// Results in wacky scaling on the high res layer as window size changes.
+    Projection,
+}
+
 pub struct PixelPerfectPlugin(pub CanvasDimensions);
 
 impl Plugin for PixelPerfectPlugin {
@@ -48,14 +65,15 @@ impl Plugin for PixelPerfectPlugin {
         setup_camera(app.world_mut());
         app.insert_resource(self.0)
             .insert_resource(AlignCanvasToCamera)
-            .add_systems(Update, (fit_canvas, resize_canvas, propogate_render_layers));
-        //.add_systems(
-        //    PostUpdate,
-        //    align_canvas_to_camera
-        //        .before(TransformSystem::TransformPropagate)
-        //        .after(CameraSystem::UpdateCamera)
-        //        .run_if(resource_exists::<AlignCanvasToCamera>),
-        //);
+            .insert_resource(Scaling::Canvas)
+            .add_systems(Update, (fit_canvas, resize_canvas, propogate_render_layers))
+            .add_systems(
+                PostUpdate,
+                align_canvas_to_camera
+                    .before(TransformSystem::TransformPropagate)
+                    .after(CameraSystem::UpdateCamera)
+                    .run_if(resource_exists::<AlignCanvasToCamera>),
+            );
         // .add_systems(
         //     PostUpdate,
         //     (correct_camera
@@ -114,15 +132,27 @@ fn setup_camera(world: &mut World) {
 }
 
 fn fit_canvas(
+    scaling: Res<Scaling>,
     dimensions: Res<CanvasDimensions>,
     mut resize_events: EventReader<WindowResized>,
     mut canvas: Single<&mut Transform, With<Canvas>>,
+    mut projections: Query<&mut OrthographicProjection, With<OuterCamera>>,
 ) {
     for event in resize_events.read() {
         let h_scale = event.width / dimensions.width as f32;
         let v_scale = event.height / dimensions.height as f32;
         let scale = h_scale.min(v_scale);
-        canvas.scale = Vec3::new(scale, scale, 1.);
+
+        match *scaling {
+            Scaling::Canvas => {
+                canvas.scale = Vec3::new(scale, scale, 1.);
+            }
+            Scaling::Projection => {
+                for mut projection in projections.iter_mut() {
+                    projection.scale = 1. / scale;
+                }
+            }
+        }
     }
 }
 
@@ -178,16 +208,16 @@ fn propogate_render_layers(
     }
 }
 
-//fn align_canvas_to_camera(
-//    mut cameras: Query<&mut Transform, (With<OuterCamera>, Without<Canvas>)>,
-//    canvas: Single<&mut Transform, (With<Canvas>, Without<OuterCamera>)>,
-//    main_camera: Single<&Transform, (With<MainCamera>, Without<OuterCamera>, Without<Canvas>)>,
-//) {
-//    //for mut camera in cameras.iter_mut() {
-//    //    camera.translation = main_camera.translation;
-//    //}
-//    //canvas.into_inner().translation = main_camera.translation;
-//}
+fn align_canvas_to_camera(
+    mut cameras: Query<&mut Transform, (With<OuterCamera>, Without<Canvas>)>,
+    canvas: Single<&mut Transform, (With<Canvas>, Without<OuterCamera>)>,
+    main_camera: Single<&Transform, (With<MainCamera>, Without<OuterCamera>, Without<Canvas>)>,
+) {
+    for mut camera in cameras.iter_mut() {
+        camera.translation = main_camera.translation;
+    }
+    canvas.into_inner().translation = main_camera.translation;
+}
 
 // #[derive(Component)]
 // struct TempOffset(Vec3);
