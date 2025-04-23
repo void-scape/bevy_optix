@@ -1,10 +1,31 @@
-use crate::pixel_perfect::Canvas;
 use bevy::{
     asset::load_internal_asset,
-    ecs::query::QuerySingleError,
+    core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
-    render::render_resource::{AsBindGroup, ShaderType},
-    sprite::{Material2d, Material2dPlugin},
+    render::{
+        globals::{GlobalsBuffer, GlobalsUniform},
+        render_resource::ShaderType,
+    },
+};
+use bevy::{
+    core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+    ecs::query::QueryItem,
+    render::{
+        extract_component::{
+            ComponentUniforms, DynamicUniformIndex, ExtractComponent, ExtractComponentPlugin,
+            UniformComponentPlugin,
+        },
+        render_graph::{
+            NodeRunError, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNode, ViewNodeRunner,
+        },
+        render_resource::{
+            binding_types::{sampler, texture_2d, uniform_buffer},
+            *,
+        },
+        renderer::{RenderContext, RenderDevice},
+        view::ViewTarget,
+        RenderApp,
+    },
 };
 use bevy_tween::{component_tween_system, prelude::Interpolator, BevyTweenRegisterSystems};
 
@@ -14,13 +35,12 @@ pub struct GlitchPlugin;
 
 impl Plugin for GlitchPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(Material2dPlugin::<Glitch>::default())
-            .add_tween_systems(component_tween_system::<TweenGlitch>())
-            .init_asset::<Glitch>()
-            .add_systems(Startup, |mut commands: Commands| {
-                commands.spawn(GlitchIntensity::default());
-            })
-            .add_systems(Update, tween_glitch);
+        app.add_plugins((
+            ExtractComponentPlugin::<GlitchSettings>::default(),
+            UniformComponentPlugin::<GlitchSettings>::default(),
+        ))
+        .add_tween_systems(component_tween_system::<TweenGlitch>())
+        .add_systems(Update, tween_glitch);
 
         load_internal_asset!(
             app,
@@ -28,23 +48,61 @@ impl Plugin for GlitchPlugin {
             "shaders/glitch.wgsl",
             Shader::from_wgsl
         );
-    }
-}
 
-/// Set the post processing glitch `INTENSITY` from 0-10.
-pub fn set_glitch_intensity<const INTENSITY: usize>(
-    canvas: Option<Single<&MeshMaterial2d<Glitch>, With<Canvas>>>,
-    mut glitches: ResMut<Assets<Glitch>>,
-) {
-    if let Some(handle) = canvas {
-        let Some(glitch) = glitches.get_mut(*handle) else {
-            error!("failed to set glitch intensity: `Glitch` not found in `Assets<Glitch>`");
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
 
-        glitch.uniform.intensity = INTENSITY as f32 / 10.;
-    } else {
-        warn!("failed to set glitch intensity: `Canvas` is not found (spawned in `PixelPerfectPlugin`)");
+        render_app
+            .add_render_graph_node::<ViewNodeRunner<GlitchNode>>(Core2d, GlitchLabel)
+            .add_render_graph_edges(
+                Core2d,
+                (
+                    Node2d::Tonemapping,
+                    GlitchLabel,
+                    Node2d::EndMainPassPostProcessing,
+                ),
+            );
+    }
+
+    fn finish(&self, app: &mut App) {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+
+        render_app.init_resource::<GlitchPipeline>();
+    }
+}
+
+#[derive(Component, Clone, Copy, ExtractComponent, ShaderType)]
+pub struct GlitchSettings {
+    pub shake_power: f32,
+    pub shake_rate: f32,
+    pub shake_speed: f32,
+    pub shake_block_size: f32,
+    pub shake_color_rate: f32,
+    pub intensity: f32,
+}
+
+impl Default for GlitchSettings {
+    fn default() -> Self {
+        Self {
+            shake_power: 0.03,
+            shake_rate: 0.5,
+            shake_speed: 5.,
+            shake_block_size: 30.5,
+            shake_color_rate: 0.01,
+            intensity: 0.5,
+        }
+    }
+}
+
+impl GlitchSettings {
+    pub fn from_intensity(intensity: f32) -> Self {
+        Self {
+            intensity,
+            ..Default::default()
+        }
     }
 }
 
@@ -78,98 +136,133 @@ impl Interpolator for TweenGlitch {
     }
 }
 
-fn tween_glitch(
-    glitch_query: Query<&GlitchIntensity>,
-    canvas: Option<Single<&MeshMaterial2d<Glitch>, With<Canvas>>>,
-    mut glitches: ResMut<Assets<Glitch>>,
-) {
-    match glitch_query.get_single() {
-        Ok(intensity) => {
-            if let Some(handle) = canvas {
-                let Some(glitch) = glitches.get_mut(*handle) else {
-                    error!(
-                        "failed to set glitch intensity: `Glitch` not found in `Assets<Glitch>`"
-                    );
-                    return;
-                };
-
-                if glitch.uniform.intensity != intensity.0 {
-                    glitch.uniform.intensity = intensity.0;
-                }
-            } else {
-                warn!("failed to set glitch intensity: `Canvas` is not found (spawned in `PixelPerfectPlugin`)");
-            }
-        }
-        Err(QuerySingleError::MultipleEntities(err)) => {
-            error_once!("(warns once) failed to tween the screen `Glitch`: {err}");
-        }
-        _ => {}
+fn tween_glitch(mut glitch_query: Query<(&mut GlitchSettings, &GlitchIntensity)>) {
+    for (mut settings, intensity) in glitch_query.iter_mut() {
+        settings.intensity = intensity.0;
     }
 }
 
-#[derive(Debug, Clone, Asset, TypePath, AsBindGroup)]
-pub struct Glitch {
-    #[texture(0)]
-    #[sampler(1)]
-    pub image: Handle<Image>,
-    #[uniform(2)]
-    pub uniform: GlitchUniform,
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+struct GlitchLabel;
+
+#[derive(Default)]
+struct GlitchNode;
+
+impl ViewNode for GlitchNode {
+    type ViewQuery = (
+        &'static ViewTarget,
+        &'static GlitchSettings,
+        &'static DynamicUniformIndex<GlitchSettings>,
+    );
+
+    fn run(
+        &self,
+        _graph: &mut RenderGraphContext,
+        render_context: &mut RenderContext,
+        (view_target, _post_process_settings, settings_index): QueryItem<Self::ViewQuery>,
+        world: &World,
+    ) -> Result<(), NodeRunError> {
+        let post_process_pipeline = world.resource::<GlitchPipeline>();
+        let pipeline_cache = world.resource::<PipelineCache>();
+        let Some(pipeline) = pipeline_cache.get_render_pipeline(post_process_pipeline.pipeline_id)
+        else {
+            return Ok(());
+        };
+
+        let settings_uniforms = world.resource::<ComponentUniforms<GlitchSettings>>();
+        let Some(settings_binding) = settings_uniforms.uniforms().binding() else {
+            return Ok(());
+        };
+
+        let Some(globals_binding) = world.resource::<GlobalsBuffer>().buffer.binding() else {
+            return Ok(());
+        };
+
+        let post_process = view_target.post_process_write();
+        let bind_group = render_context.render_device().create_bind_group(
+            "post_process_bind_group",
+            &post_process_pipeline.layout,
+            &BindGroupEntries::sequential((
+                post_process.source,
+                &post_process_pipeline.sampler,
+                settings_binding,
+                globals_binding,
+            )),
+        );
+
+        let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("post_process_pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: post_process.destination,
+                resolve_target: None,
+                ops: Operations::default(),
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        render_pass.set_render_pipeline(pipeline);
+        render_pass.set_bind_group(0, &bind_group, &[settings_index.index()]);
+        render_pass.draw(0..3, 0..1);
+
+        Ok(())
+    }
 }
 
-impl Glitch {
-    pub fn new(image: Handle<Image>, uniform: GlitchUniform) -> Self {
-        Self { image, uniform }
-    }
+#[derive(Resource)]
+struct GlitchPipeline {
+    layout: BindGroupLayout,
+    sampler: Sampler,
+    pipeline_id: CachedRenderPipelineId,
+}
 
-    pub fn from_image(image: Handle<Image>) -> Self {
+impl FromWorld for GlitchPipeline {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+
+        let layout = render_device.create_bind_group_layout(
+            "glitch_bind_group_layout",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<GlitchSettings>(true),
+                    uniform_buffer::<GlobalsUniform>(false),
+                ),
+            ),
+        );
+
+        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        let pipeline_id =
+            world
+                .resource_mut::<PipelineCache>()
+                .queue_render_pipeline(RenderPipelineDescriptor {
+                    label: Some("glitch_pipeline".into()),
+                    layout: vec![layout.clone()],
+                    vertex: fullscreen_shader_vertex_state(),
+                    fragment: Some(FragmentState {
+                        shader: GLITCH_SHADER_HANDLE,
+                        shader_defs: vec![],
+                        entry_point: "fragment".into(),
+                        targets: vec![Some(ColorTargetState {
+                            format: TextureFormat::Rgba16Float,
+                            blend: None,
+                            write_mask: ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: MultisampleState::default(),
+                    push_constant_ranges: vec![],
+                    zero_initialize_workgroup_memory: false,
+                });
+
         Self {
-            image,
-            uniform: GlitchUniform::default(),
+            layout,
+            sampler,
+            pipeline_id,
         }
-    }
-}
-
-#[derive(Debug, Copy, Clone, AsBindGroup, TypePath, ShaderType)]
-#[uniform(2, GlitchUniform)]
-pub struct GlitchUniform {
-    pub shake_power: f32,
-    pub shake_rate: f32,
-    pub shake_speed: f32,
-    pub shake_block_size: f32,
-    pub shake_color_rate: f32,
-    pub intensity: f32,
-}
-
-impl GlitchUniform {
-    pub fn from_intensity(intensity: f32) -> Self {
-        Self {
-            intensity,
-            ..Default::default()
-        }
-    }
-}
-
-impl From<&GlitchUniform> for GlitchUniform {
-    fn from(value: &GlitchUniform) -> Self {
-        *value
-    }
-}
-
-impl Default for GlitchUniform {
-    fn default() -> Self {
-        Self {
-            shake_power: 0.03,
-            shake_rate: 0.5,
-            shake_speed: 5.,
-            shake_block_size: 30.5,
-            shake_color_rate: 0.01,
-            intensity: 0.5,
-        }
-    }
-}
-
-impl Material2d for Glitch {
-    fn fragment_shader() -> bevy::render::render_resource::ShaderRef {
-        GLITCH_SHADER_HANDLE.into()
     }
 }

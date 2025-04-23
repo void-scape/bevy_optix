@@ -36,6 +36,12 @@ impl CanvasDimensions {
 #[derive(Component)]
 pub struct OuterCamera;
 
+#[derive(Component)]
+pub struct ForegroundCamera;
+
+#[derive(Component)]
+pub struct BackgroundCamera;
+
 /// If this resource exists, then move the [`Canvas`] and [`OuterCamera`] to the position of the [`MainCamera`].
 ///
 /// This enables the outer camera to capture anything positioned within the `pixel_perfect::HIGH_RES_BACKGROUND_LAYER` and
@@ -102,6 +108,7 @@ fn setup_camera(world: &mut World) {
         },
         OuterCamera,
         HIGH_RES_BACKGROUND_LAYER,
+        BackgroundCamera,
         Msaa::Off,
     ));
     world.commands().spawn((
@@ -127,6 +134,7 @@ fn setup_camera(world: &mut World) {
         },
         OuterCamera,
         HIGH_RES_LAYER,
+        ForegroundCamera,
         Msaa::Off,
     ));
 }
@@ -179,7 +187,7 @@ fn resize_canvas(
             label: None,
             size: canvas_size,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Bgra8UnormSrgb,
+            format: TextureFormat::bevy_default(),
             mip_level_count: 1,
             sample_count: 1,
             usage: TextureUsages::TEXTURE_BINDING
