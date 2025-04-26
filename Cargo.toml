@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.15", default-features = false, features = [
+bevy = { version = "0.16", default-features = false, features = [
     "bevy_window",
 ] }
 bevy_sequence = { git = "https://github.com/CorvusPrudens/bevy_sequence.git", optional = true }
-bevy_tween = "0.7"
+bevy_tween = { git = "https://github.com/Rabbival/bevy_tween", branch = "bevy-v0.16.0" }
 rand = "0.8"
 
 [features]

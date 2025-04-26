@@ -1,4 +1,4 @@
-use bevy::ecs::component::ComponentId;
+use bevy::ecs::component::{ComponentId, HookContext};
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use std::time::Duration;
@@ -209,8 +209,8 @@ pub struct MoveTo {
     domain: Domain,
 }
 
-fn on_insert_moveto(mut world: DeferredWorld, entity: Entity, _: ComponentId) {
-    world.commands().entity(entity).remove::<Binded>();
+fn on_insert_moveto(mut world: DeferredWorld, context: HookContext) {
+    world.commands().entity(context.entity).remove::<Binded>();
 }
 
 impl MoveTo {

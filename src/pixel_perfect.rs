@@ -144,7 +144,7 @@ fn fit_canvas(
     dimensions: Res<CanvasDimensions>,
     mut resize_events: EventReader<WindowResized>,
     mut canvas: Single<&mut Transform, With<Canvas>>,
-    mut projections: Query<&mut OrthographicProjection, With<OuterCamera>>,
+    mut projections: Query<&mut Projection, With<OuterCamera>>,
 ) {
     for event in resize_events.read() {
         let h_scale = event.width / dimensions.width as f32;
@@ -157,7 +157,9 @@ fn fit_canvas(
             }
             Scaling::Projection => {
                 for mut projection in projections.iter_mut() {
-                    projection.scale = 1. / scale;
+                    if let Projection::Orthographic(projection) = projection.as_mut() {
+                        projection.scale = 1. / scale;
+                    }
                 }
             }
         }
@@ -201,7 +203,7 @@ fn resize_canvas(
 
     new_canvas.resize(canvas_size);
     let handle = images.add(new_canvas);
-    camera.target = RenderTarget::Image(handle.clone());
+    camera.target = RenderTarget::Image(handle.clone().into());
     commands.entity(*canvas).insert(Sprite::from_image(handle));
 }
 
@@ -211,7 +213,7 @@ fn propogate_render_layers(
 ) {
     for (children, layers) in parents.iter() {
         for child in children.iter() {
-            commands.entity(*child).insert(layers.clone());
+            commands.entity(child).insert(layers.clone());
         }
     }
 }

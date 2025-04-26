@@ -1,4 +1,7 @@
-use bevy::{ecs::component::StorageType, prelude::*};
+use bevy::{
+    ecs::component::{Mutable, StorageType},
+    prelude::*,
+};
 use std::marker::PhantomData;
 
 /// Apply post processing to the main camera through an [`ApplyPostProcess`].
@@ -75,9 +78,10 @@ impl<T, M> Default for PostProcessBinding<T, M> {
 
 impl<T: ApplyPostProcess + Sync, M: Component> Component for PostProcessBinding<T, M> {
     const STORAGE_TYPE: StorageType = StorageType::Table;
+    type Mutability = Mutable;
 
     fn register_component_hooks(hooks: &mut bevy::ecs::component::ComponentHooks) {
-        hooks.on_remove(|mut world, _, _| {
+        hooks.on_remove(|mut world, _| {
             world.commands().queue(remove::<T, M>);
         });
     }
