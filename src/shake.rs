@@ -1,9 +1,31 @@
-// Original from https://github.com/johanhelsing/bevy_trauma_shake
+// MIT License
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+//! Original from https://github.com/johanhelsing/bevy_trauma_shake
+//!
+//! Simple camera shake API with configurable [`ShakeSettings`] on a camera.
 
 use bevy::prelude::*;
 
 pub mod prelude {
-    pub use super::{ScreenShakePlugin, Shake, ShakeSettings};
+    pub use super::{ScreenShakePlugin, Shake, ShakeSettings, TraumaCommands};
 }
 
 pub struct ScreenShakePlugin;
@@ -112,6 +134,37 @@ fn restore(mut shakes: Query<(&mut Shake, &mut Transform)>) {
         if shake.reference_translation.is_some() {
             let translation = shake.reference_translation.take().unwrap();
             transform.translation = translation;
+        }
+    }
+}
+
+/// Extension trait for [`Command`], adding commands for easily applying trauma
+/// fire-and-forget-style.
+pub trait TraumaCommands {
+    /// Applies the given trauma to all `Shake`s
+    /// ```
+    /// # use bevy::prelude::*;
+    /// use bevy_trauma_shake::prelude::*;
+    ///
+    /// fn add_shake(mut commands: Commands) {
+    ///     commands.add_trauma(0.2);
+    /// }
+    /// ```
+    fn add_trauma(&mut self, trauma: f32);
+}
+
+impl TraumaCommands for Commands<'_, '_> {
+    fn add_trauma(&mut self, trauma: f32) {
+        self.queue(AddTraumaCommand(trauma));
+    }
+}
+
+struct AddTraumaCommand(f32);
+
+impl Command for AddTraumaCommand {
+    fn apply(self, world: &mut World) {
+        for mut shake in world.query::<&mut Shake>().iter_mut(world) {
+            shake.add_trauma(self.0);
         }
     }
 }
