@@ -1,5 +1,5 @@
 use bevy::{
-    asset::load_internal_asset,
+    asset::{load_internal_asset, weak_handle},
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
@@ -11,6 +11,7 @@ use bevy::{
     core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
     ecs::query::QueryItem,
     render::{
+        RenderApp,
         extract_component::{
             ComponentUniforms, DynamicUniformIndex, ExtractComponent, ExtractComponentPlugin,
             UniformComponentPlugin,
@@ -24,12 +25,12 @@ use bevy::{
         },
         renderer::{RenderContext, RenderDevice},
         view::ViewTarget,
-        RenderApp,
     },
 };
-use bevy_tween::{component_tween_system, prelude::Interpolator, BevyTweenRegisterSystems};
+use bevy_tween::{BevyTweenRegisterSystems, component_tween_system, prelude::Interpolator};
 
-pub const GLITCH_SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(0x19A72E656);
+pub const GLITCH_SHADER_HANDLE: Handle<Shader> =
+    weak_handle!("c329472b-ca66-433b-b361-9781529c7c6c");
 
 pub struct GlitchPlugin;
 

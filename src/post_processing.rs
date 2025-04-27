@@ -57,14 +57,13 @@ impl<T: Component> ApplyPostProcess for T {
     }
 }
 
-pub fn apply<M: Component>(post_process: impl ApplyPostProcess) -> impl FnOnce(&mut World) {
-    move |world: &mut World| match world.query_filtered::<Entity, With<M>>().get_single(world) {
-        Ok(camera) => {
-            post_process.insert(&mut world.entity_mut(camera));
-        }
-        Err(e) => {
-            error!("failed to apply post process to main camera: {e}");
-        }
+pub fn apply<M: Component>(
+    post_process: impl ApplyPostProcess,
+) -> impl FnOnce(&mut World) -> Result {
+    move |world: &mut World| {
+        let camera = world.query_filtered::<Entity, With<M>>().single(world)?;
+        post_process.insert(&mut world.entity_mut(camera));
+        Ok(())
     }
 }
 
@@ -90,27 +89,19 @@ impl<T: ApplyPostProcess + Sync, M: Component> Component for PostProcessBinding<
 pub fn bind<T: ApplyPostProcess + Sync, M: Component>(
     post_process: T,
     entity: Entity,
-) -> impl FnOnce(&mut World) {
-    move |world: &mut World| match world.query_filtered::<Entity, With<M>>().get_single(world) {
-        Ok(camera) => {
-            post_process.insert(&mut world.entity_mut(camera));
-            world
-                .entity_mut(entity)
-                .with_child(PostProcessBinding::<T, M>::default());
-        }
-        Err(e) => {
-            error!("failed to bind post process to main camera: {e}");
-        }
+) -> impl FnOnce(&mut World) -> Result {
+    move |world: &mut World| {
+        let camera = world.query_filtered::<Entity, With<M>>().single(world)?;
+        post_process.insert(&mut world.entity_mut(camera));
+        world
+            .entity_mut(entity)
+            .with_child(PostProcessBinding::<T, M>::default());
+        Ok(())
     }
 }
 
-pub fn remove<T: ApplyPostProcess, M: Component>(world: &mut World) {
-    match world.query_filtered::<Entity, With<M>>().get_single(world) {
-        Ok(camera) => {
-            T::remove(&mut world.entity_mut(camera));
-        }
-        Err(e) => {
-            error!("failed to remove post process from main camera: {e}");
-        }
-    }
+pub fn remove<T: ApplyPostProcess, M: Component>(world: &mut World) -> Result {
+    let camera = world.query_filtered::<Entity, With<M>>().single(world)?;
+    T::remove(&mut world.entity_mut(camera));
+    Ok(())
 }

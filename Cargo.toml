@@ -11,6 +11,7 @@ bevy = { version = "0.16", default-features = false, features = [
 ] }
 bevy_sequence = { git = "https://github.com/CorvusPrudens/bevy_sequence.git", optional = true }
 bevy_tween = { git = "https://github.com/Rabbival/bevy_tween", branch = "bevy-v0.16.0" }
+noise = { path = "../noise" }
 rand = "0.8"
 
 [features]

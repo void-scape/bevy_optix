@@ -35,31 +35,21 @@ pub struct AnchorTarget;
 pub struct DynamicallyAnchored(Entity);
 
 pub(crate) fn anchor(
-    camera: Option<Single<&mut Transform, With<MainCamera>>>,
-    anchor: Query<&Transform, (With<CameraAnchor>, Without<MainCamera>)>,
+    mut camera: Single<&mut Transform, With<MainCamera>>,
+    anchor: Single<&Transform, (With<CameraAnchor>, Without<MainCamera>)>,
 ) {
-    if let Ok(t) = anchor.get_single() {
-        if let Some(mut camera) = camera {
-            camera.translation = t.translation;
-        }
-    }
+    camera.translation = anchor.translation;
 }
 
 pub(crate) fn unbind_dyn_anchor(
     q: Query<(&DynamicCameraAnchor, &Transform)>,
-    anchor_target: Query<(Entity, &Transform), With<AnchorTarget>>,
-    camera: Query<(Entity, &Transform, &DynamicallyAnchored), With<MainCamera>>,
+    anchor_target: Single<(Entity, &Transform), With<AnchorTarget>>,
+    camera: Single<(Entity, &Transform, &DynamicallyAnchored), With<MainCamera>>,
     mut commands: Commands,
 ) {
-    let Ok((camera, camera_transform, anchor_ref)) = camera.get_single() else {
-        return;
-    };
-
+    let (camera, camera_transform, anchor_ref) = camera.into_inner();
+    let (target, target_transform) = anchor_target.into_inner();
     let Ok((anchor, anchor_transform)) = q.get(anchor_ref.0) else {
-        return;
-    };
-
-    let Ok((target, target_transform)) = anchor_target.get_single() else {
         return;
     };
 
@@ -84,17 +74,11 @@ pub(crate) fn unbind_dyn_anchor(
 
 pub(crate) fn bind_to_dyn_anchor(
     q: Query<(Entity, &DynamicCameraAnchor, &Transform)>,
-    target: Query<&Transform, With<AnchorTarget>>,
-    camera: Query<(Entity, &Transform), (With<MainCamera>, Without<DynamicallyAnchored>)>,
+    target_transform: Single<&Transform, With<AnchorTarget>>,
+    camera: Single<(Entity, &Transform), (With<MainCamera>, Without<DynamicallyAnchored>)>,
     mut commands: Commands,
 ) {
-    let Ok((camera, camera_transform)) = camera.get_single() else {
-        return;
-    };
-
-    let Ok(target_transform) = target.get_single() else {
-        return;
-    };
+    let (camera, camera_transform) = camera.into_inner();
 
     for (entity, anchor, transform) in q.iter() {
         if transform
