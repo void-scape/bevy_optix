@@ -1,10 +1,8 @@
-use crate::camera::CameraSystem;
-
 use super::camera::MainCamera;
+use bevy::prelude::*;
 use bevy::{
     core_pipeline::tonemapping::Tonemapping,
     image::ImageSamplerDescriptor,
-    prelude::*,
     render::{
         camera::RenderTarget,
         render_resource::{
@@ -16,7 +14,6 @@ use bevy::{
 };
 
 pub const HIGH_RES_LAYER: RenderLayers = RenderLayers::layer(1);
-pub const HIGH_RES_BACKGROUND_LAYER: RenderLayers = RenderLayers::layer(2);
 
 /// Determines the resolution of the [`MainCamera`].
 #[derive(Debug, Clone, Copy, Resource)]
@@ -35,12 +32,6 @@ impl CanvasDimensions {
 /// [`MainCamera`] inbetween these two high resolution layers.
 #[derive(Component)]
 pub struct OuterCamera;
-
-#[derive(Component)]
-pub struct ForegroundCamera;
-
-#[derive(Component)]
-pub struct BackgroundCamera;
 
 /// If this resource exists, then move the [`Canvas`] and [`OuterCamera`] to the position of the [`MainCamera`].
 ///
@@ -68,18 +59,19 @@ pub struct PixelPerfectPlugin(pub CanvasDimensions);
 
 impl Plugin for PixelPerfectPlugin {
     fn build(&self, app: &mut App) {
-        setup_camera(app.world_mut());
         app.insert_resource(self.0)
             .insert_resource(AlignCanvasToCamera)
-            .insert_resource(Scaling::Canvas)
-            .add_systems(Update, (fit_canvas, resize_canvas, propogate_render_layers))
-            .add_systems(
-                PostUpdate,
-                align_canvas_to_camera
-                    .before(TransformSystem::TransformPropagate)
-                    .after(CameraSystem::UpdateCamera)
-                    .run_if(resource_exists::<AlignCanvasToCamera>),
-            );
+            .insert_resource(Scaling::Projection)
+            .add_systems(PreStartup, setup_cameras)
+            .add_systems(Update, (fit_canvas, resize_canvas, propogate_render_layers));
+        //.add_systems(
+        //    PostUpdate,
+        //    align_canvas_to_camera
+        //        .before(TransformSystem::TransformPropagate)
+        //        .after(CameraSystem::UpdateCamera)
+        //        .run_if(resource_exists::<AlignCanvasToCamera>),
+        //);
+
         // .add_systems(
         //     PostUpdate,
         //     (correct_camera
@@ -93,38 +85,21 @@ impl Plugin for PixelPerfectPlugin {
 #[derive(Component)]
 pub struct Canvas;
 
-/// Inserting the camera within the app is necessary so that [`crate::post_processing::PostProcessCommand`] can query
-/// for the main camera on startup.
-fn setup_camera(world: &mut World) {
-    world
-        .commands()
-        .spawn((Canvas, Transform::from_xyz(0., 0., -999.9), HIGH_RES_LAYER));
-    world.commands().spawn((
+fn setup_cameras(mut commands: Commands) {
+    commands.spawn((Canvas, Transform::from_xyz(0., 0., -999.9), HIGH_RES_LAYER));
+    commands.spawn((
         Camera2d,
-        Camera {
-            hdr: true,
-            order: -1,
-            ..Default::default()
-        },
-        OuterCamera,
-        HIGH_RES_BACKGROUND_LAYER,
-        BackgroundCamera,
-        Msaa::Off,
-    ));
-    world.commands().spawn((
-        Camera2d,
-        // texture is deffered to the first time `resize_canvas` runs.
         Camera {
             hdr: true,
             order: 0,
-            clear_color: ClearColorConfig::Custom(Color::NONE),
+            clear_color: ClearColorConfig::Custom(Color::BLACK),
             ..Default::default()
         },
         Tonemapping::TonyMcMapface,
         MainCamera,
         Msaa::Off,
     ));
-    world.commands().spawn((
+    commands.spawn((
         Camera2d,
         Camera {
             hdr: true,
@@ -134,7 +109,6 @@ fn setup_camera(world: &mut World) {
         },
         OuterCamera,
         HIGH_RES_LAYER,
-        ForegroundCamera,
         Msaa::Off,
     ));
 }
@@ -218,16 +192,16 @@ fn propogate_render_layers(
     }
 }
 
-fn align_canvas_to_camera(
-    mut cameras: Query<&mut Transform, (With<OuterCamera>, Without<Canvas>)>,
-    canvas: Single<&mut Transform, (With<Canvas>, Without<OuterCamera>)>,
-    main_camera: Single<&Transform, (With<MainCamera>, Without<OuterCamera>, Without<Canvas>)>,
-) {
-    for mut camera in cameras.iter_mut() {
-        camera.translation = main_camera.translation;
-    }
-    canvas.into_inner().translation = main_camera.translation;
-}
+//fn align_canvas_to_camera(
+//    mut cameras: Query<&mut Transform, (With<OuterCamera>, Without<Canvas>)>,
+//    canvas: Single<&mut Transform, (With<Canvas>, Without<OuterCamera>)>,
+//    main_camera: Single<&Transform, (With<MainCamera>, Without<OuterCamera>, Without<Canvas>)>,
+//) {
+//    for mut camera in cameras.iter_mut() {
+//        camera.translation = main_camera.translation;
+//    }
+//    canvas.into_inner().translation = main_camera.translation;
+//}
 
 // #[derive(Component)]
 // struct TempOffset(Vec3);

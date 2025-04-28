@@ -80,10 +80,18 @@ impl ShakeSettings {
 #[derive(Component, Reflect, Default, Clone, Debug)]
 pub struct Shake {
     trauma: f32,
+    trauma_limit: Option<f32>,
     reference_translation: Option<Vec3>,
 }
 
 impl Shake {
+    pub fn from_trauma_limit(limit: f32) -> Self {
+        Self {
+            trauma_limit: Some(limit),
+            ..Default::default()
+        }
+    }
+
     /// Adds the specified trauma. Trauma is clamped between 0 and 1, and decays
     /// over time according to [`ShakeSettings::decay_per_second`].
     pub fn add_trauma(&mut self, amount: f32) {
@@ -95,12 +103,14 @@ fn shake(mut shakes: Query<(&mut Shake, &mut Transform, Option<&ShakeSettings>)>
     for (mut shake, mut transform, settings) in &mut shakes {
         let settings = settings.unwrap_or(&ShakeSettings::DEFAULT);
 
-        let trauma = f32::max(
-            shake.trauma - settings.decay_per_second * time.delta_secs(),
-            0.0,
+        let trauma = f32::min(
+            f32::max(
+                shake.trauma - settings.decay_per_second * time.delta_secs(),
+                0.0,
+            ),
+            shake.trauma_limit.unwrap_or(f32::MAX),
         );
 
-        // avoid change detection
         if shake.trauma != trauma {
             shake.trauma = trauma;
         }

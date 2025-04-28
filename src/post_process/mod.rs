@@ -4,6 +4,13 @@ use bevy::{
 };
 use std::marker::PhantomData;
 
+mod app;
+
+pub mod prelude {
+    pub use super::PostProcessCommand;
+    pub use super::app::{PostProcessMaterial, PostProcessPlugin};
+}
+
 /// Apply post processing to the main camera through an [`ApplyPostProcess`].
 ///
 /// All [`Component`] types implement [`ApplyPostProcess`].
