@@ -2,6 +2,7 @@
 
 pub mod anchor;
 pub mod camera;
+pub mod debug;
 pub mod glitch;
 pub mod pixel_perfect;
 pub mod post_process;
