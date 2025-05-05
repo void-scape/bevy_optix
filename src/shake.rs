@@ -82,6 +82,7 @@ pub struct Shake {
     trauma: f32,
     trauma_limit: Option<f32>,
     reference_translation: Option<Vec3>,
+    paused: bool,
 }
 
 impl Shake {
@@ -97,10 +98,22 @@ impl Shake {
     pub fn add_trauma(&mut self, amount: f32) {
         self.trauma = (self.trauma + amount).clamp(0., 1.);
     }
+
+    pub fn pause(&mut self) {
+        self.paused = true;
+    }
+
+    pub fn unpause(&mut self) {
+        self.paused = false;
+    }
 }
 
 fn shake(mut shakes: Query<(&mut Shake, &mut Transform, Option<&ShakeSettings>)>, time: Res<Time>) {
     for (mut shake, mut transform, settings) in &mut shakes {
+        if shake.paused {
+            continue;
+        }
+
         let settings = settings.unwrap_or(&ShakeSettings::DEFAULT);
 
         let trauma = f32::min(
