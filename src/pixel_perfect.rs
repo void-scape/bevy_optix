@@ -20,12 +20,7 @@ pub const HIGH_RES_LAYER: RenderLayers = RenderLayers::layer(1);
 pub struct CanvasDimensions {
     pub width: u32,
     pub height: u32,
-}
-
-impl CanvasDimensions {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
+    pub pixel_scale: f32,
 }
 
 /// Captures the `pixel_perfect::HIGH_RES_BACKGROUND_LAYER` and `pixel_perfect::HIGH_RES_LAYER`, rendering the [`Canvas`] texture generated from the
@@ -60,8 +55,8 @@ pub struct PixelPerfectPlugin(pub CanvasDimensions);
 impl Plugin for PixelPerfectPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(self.0)
-            .insert_resource(AlignCanvasToCamera)
-            .insert_resource(Scaling::Projection)
+            //.insert_resource(AlignCanvasToCamera)
+            //.insert_resource(Scaling::Projection)
             .add_systems(PreStartup, setup_cameras)
             .add_systems(Update, (fit_canvas, resize_canvas, propogate_render_layers));
         //.add_systems(
@@ -85,8 +80,12 @@ impl Plugin for PixelPerfectPlugin {
 #[derive(Component)]
 pub struct Canvas;
 
-fn setup_cameras(mut commands: Commands) {
-    commands.spawn((Canvas, Transform::from_xyz(0., 0., -999.9), HIGH_RES_LAYER));
+fn setup_cameras(mut commands: Commands, dimensions: Res<CanvasDimensions>) {
+    commands.spawn((
+        Canvas,
+        Transform::from_xyz(0., 0., -999.9).with_scale(Vec3::splat(dimensions.pixel_scale)),
+        HIGH_RES_LAYER,
+    ));
     commands.spawn((
         Camera2d,
         Camera {
@@ -114,28 +113,17 @@ fn setup_cameras(mut commands: Commands) {
 }
 
 fn fit_canvas(
-    scaling: Res<Scaling>,
     dimensions: Res<CanvasDimensions>,
     mut resize_events: EventReader<WindowResized>,
-    mut canvas: Single<&mut Transform, With<Canvas>>,
-    mut projections: Query<&mut Projection, With<OuterCamera>>,
+    mut projection: Single<&mut Projection, With<OuterCamera>>,
 ) {
     for event in resize_events.read() {
         let h_scale = event.width / dimensions.width as f32;
         let v_scale = event.height / dimensions.height as f32;
-        let scale = h_scale.min(v_scale);
+        let scale = h_scale.min(v_scale) / dimensions.pixel_scale;
 
-        match *scaling {
-            Scaling::Canvas => {
-                canvas.scale = Vec3::new(scale, scale, 1.);
-            }
-            Scaling::Projection => {
-                for mut projection in projections.iter_mut() {
-                    if let Projection::Orthographic(projection) = projection.as_mut() {
-                        projection.scale = 1. / scale;
-                    }
-                }
-            }
+        if let Projection::Orthographic(projection) = projection.as_mut() {
+            projection.scale = 1. / scale;
         }
     }
 }
