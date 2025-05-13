@@ -103,7 +103,6 @@ fn setup_cameras(mut commands: Commands, dimensions: Res<CanvasDimensions>) {
         Camera {
             hdr: true,
             order: 1,
-            clear_color: ClearColorConfig::None,
             ..Default::default()
         },
         OuterCamera,
