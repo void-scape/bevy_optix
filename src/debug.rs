@@ -74,7 +74,7 @@ impl DebugRect {
                 .run_system_once(
                     move |mut commands: Commands, debug_rects: Query<&DebugRect>| {
                         if let Ok(rect) = debug_rects.get(ctx.entity) {
-                            commands.entity(ctx.entity).with_child(Sprite {
+                            commands.entity(ctx.entity).insert(Sprite {
                                 rect: Some(rect.rect),
                                 color: rect.color,
                                 ..Default::default()
@@ -115,7 +115,7 @@ impl DebugCircle {
 
                             commands
                                 .entity(ctx.entity)
-                                .with_child((Mesh2d(mesh), MeshMaterial2d(material)));
+                                .insert((Mesh2d(mesh), MeshMaterial2d(material)));
                         }
                     },
                 )
