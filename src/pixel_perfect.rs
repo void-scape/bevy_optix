@@ -94,7 +94,7 @@ fn setup_cameras(mut commands: Commands, dimensions: Res<CanvasDimensions>) {
             clear_color: ClearColorConfig::Custom(Color::BLACK),
             ..Default::default()
         },
-        Tonemapping::TonyMcMapface,
+        //Tonemapping::Reinhard,
         MainCamera,
         Msaa::Off,
     ));
