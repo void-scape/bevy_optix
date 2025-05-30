@@ -1,7 +1,6 @@
 use super::camera::MainCamera;
 use bevy::prelude::*;
 use bevy::{
-    core_pipeline::tonemapping::Tonemapping,
     image::ImageSamplerDescriptor,
     render::{
         camera::RenderTarget,
@@ -94,7 +93,6 @@ fn setup_cameras(mut commands: Commands, dimensions: Res<CanvasDimensions>) {
             clear_color: ClearColorConfig::Custom(Color::BLACK),
             ..Default::default()
         },
-        //Tonemapping::Reinhard,
         MainCamera,
         Msaa::Off,
     ));
