@@ -57,7 +57,7 @@ impl Plugin for PixelPerfectPlugin {
             //.insert_resource(AlignCanvasToCamera)
             //.insert_resource(Scaling::Projection)
             .add_systems(PreStartup, setup_cameras)
-            .add_systems(Update, (fit_canvas, resize_canvas, propogate_render_layers));
+            .add_systems(Update, (fit_canvas, resize_canvas, propagate_render_layers));
         //.add_systems(
         //    PostUpdate,
         //    align_canvas_to_camera
@@ -166,7 +166,7 @@ fn resize_canvas(
     commands.entity(*canvas).insert(Sprite::from_image(handle));
 }
 
-fn propogate_render_layers(
+fn propagate_render_layers(
     mut commands: Commands,
     parents: Query<(&Children, &RenderLayers), Or<(Changed<RenderLayers>, Changed<Children>)>>,
 ) {
