@@ -4,14 +4,58 @@ use bevy::ecs::world::DeferredWorld;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
-/// Quick debug render with [`DebugRect`] and [`DebugCircle`].
-///
-/// Both spawn render components as children.
+use crate::pixel_perfect::HIGH_RES_LAYER;
+
+/// Quick debug render primitives.
 pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(DebugCircleAllocator::default());
+    }
+}
+
+pub fn debug_res<R: Resource + std::fmt::Debug>(
+    transform: Transform,
+    anchor: bevy::sprite::Anchor,
+) -> impl Fn(Commands, Local<Option<Entity>>, Res<R>) {
+    move |mut commands, mut text, res| {
+        if res.is_changed() {
+            let entity = text.get_or_insert_with(|| {
+                commands
+                    .spawn((Text2d::default(), HIGH_RES_LAYER, transform, anchor))
+                    .id()
+            });
+
+            let mut entity = match commands.get_entity(*entity) {
+                Ok(entity) => entity,
+                Err(_) => commands.spawn((Text2d::default(), HIGH_RES_LAYER, transform, anchor)),
+            };
+
+            entity.insert(Text2d::new(format!("{:?}", res.as_ref())));
+        }
+    }
+}
+
+pub fn debug_single<C: Component + std::fmt::Debug>(
+    transform: Transform,
+    anchor: bevy::sprite::Anchor,
+) -> impl Fn(Commands, Local<Option<Entity>>, Single<Ref<C>>) {
+    move |mut commands, mut text, single| {
+        if single.is_changed() {
+            let entity = text.get_or_insert_with(|| {
+                commands
+                    .spawn((Text2d::default(), HIGH_RES_LAYER, transform, anchor))
+                    .id()
+            });
+
+            let mut entity = match commands.get_entity(*entity) {
+                Ok(entity) => entity,
+                Err(_) => commands.spawn((Text2d::default(), HIGH_RES_LAYER, transform, anchor)),
+            };
+
+            entity.insert(Text2d::new(format!("{:?}", single.into_inner().as_ref())));
+        }
     }
 }
 
