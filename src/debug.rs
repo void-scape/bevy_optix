@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use bevy::ecs::component::HookContext;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::ecs::world::DeferredWorld;
@@ -15,7 +17,17 @@ impl Plugin for DebugPlugin {
     }
 }
 
-pub fn debug_res<R: Resource + std::fmt::Debug>(
+pub trait DebugComponentAppExt {
+    fn debug_component<T: Component + core::fmt::Debug>(&mut self) -> &mut Self;
+}
+
+impl DebugComponentAppExt for App {
+    fn debug_component<T: Component + core::fmt::Debug>(&mut self) -> &mut Self {
+        self.add_systems(Update, (init_debug_component::<T>, debug_component::<T>))
+    }
+}
+
+pub fn debug_res<R: Resource + core::fmt::Debug>(
     transform: Transform,
     anchor: bevy::sprite::Anchor,
 ) -> impl Fn(Commands, Local<Option<Entity>>, Res<R>) {
@@ -37,7 +49,7 @@ pub fn debug_res<R: Resource + std::fmt::Debug>(
     }
 }
 
-pub fn debug_single<C: Component + std::fmt::Debug>(
+pub fn debug_single<C: Component + core::fmt::Debug>(
     transform: Transform,
     anchor: bevy::sprite::Anchor,
 ) -> impl Fn(Commands, Local<Option<Entity>>, Single<Ref<C>>) {
@@ -55,6 +67,44 @@ pub fn debug_single<C: Component + std::fmt::Debug>(
             };
 
             entity.insert(Text2d::new(format!("{:?}", single.into_inner().as_ref())));
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct DebugComponent<T>(fn(&mut EntityCommands), PhantomData<fn(T)>);
+
+impl<T> DebugComponent<T> {
+    pub fn new(bundle: fn(&mut EntityCommands)) -> Self {
+        Self(bundle, PhantomData)
+    }
+}
+
+#[derive(Component)]
+struct Debugged;
+
+fn init_debug_component<T: Component>(
+    mut commands: Commands,
+    debug: Query<(Entity, &DebugComponent<T>), (Without<Debugged>, With<T>)>,
+) {
+    for (entity, debug) in debug.iter() {
+        commands.entity(entity).insert(Debugged);
+        let mut child = commands.spawn(Text2d::default());
+        (debug.0)(&mut child);
+        child.insert(ChildOf(entity));
+    }
+}
+
+fn debug_component<T: Component + core::fmt::Debug>(
+    debug: Query<(&Children, Ref<T>), With<DebugComponent<T>>>,
+    mut text: Query<&mut Text2d>,
+) {
+    for (children, val) in debug.iter() {
+        if val.is_changed() {
+            let mut iter = text.iter_many_mut(children.iter());
+            while let Some(mut text) = iter.fetch_next() {
+                text.0 = format!("{:?}", val.as_ref());
+            }
         }
     }
 }
