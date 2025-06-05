@@ -134,7 +134,7 @@ impl DebugRect {
     }
 }
 
-#[derive(Component)]
+#[derive(Clone, Component)]
 #[require(Transform, Visibility)]
 #[component(on_add = Self::add_mesh)]
 pub struct DebugCircle {
