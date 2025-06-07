@@ -57,7 +57,7 @@ impl Plugin for PixelPerfectPlugin {
             //.insert_resource(AlignCanvasToCamera)
             //.insert_resource(Scaling::Projection)
             .add_systems(PreStartup, setup_cameras)
-            .add_systems(Update, (fit_canvas, resize_canvas, propagate_render_layers));
+            .add_systems(First, (fit_canvas, resize_canvas, propagate_render_layers));
         //.add_systems(
         //    PostUpdate,
         //    align_canvas_to_camera
