@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, Component)]
+#[require(PixelSnap)]
 pub struct MainCamera;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -339,14 +340,14 @@ fn camera_binded(
     }
 }
 
+#[derive(Default, Component)]
+pub struct PixelSnap;
+
 #[derive(Component)]
 struct SubPixelPos(Vec3);
 
-fn snap(
-    mut commands: Commands,
-    camera: Option<Single<(Entity, &mut Transform), With<MainCamera>>>,
-) {
-    if let Some((entity, mut transform)) = camera.map(|c| c.into_inner()) {
+fn snap(mut commands: Commands, mut snap: Query<(Entity, &mut Transform), With<PixelSnap>>) {
+    for (entity, mut transform) in snap.iter_mut() {
         let rounded = transform.translation.round();
         commands
             .entity(entity)
@@ -357,9 +358,9 @@ fn snap(
 
 fn release_snap(
     mut commands: Commands,
-    camera: Option<Single<(Entity, &mut Transform, &SubPixelPos), With<MainCamera>>>,
+    mut snap: Query<(Entity, &mut Transform, &SubPixelPos), With<PixelSnap>>,
 ) {
-    if let Some((entity, mut transform, sub_pixel)) = camera.map(|c| c.into_inner()) {
+    for (entity, mut transform, sub_pixel) in snap.iter_mut() {
         transform.translation = sub_pixel.0;
         commands.entity(entity).remove::<SubPixelPos>();
     }
