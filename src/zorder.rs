@@ -17,10 +17,13 @@ pub struct YOrigin(pub f32);
 
 fn origin_y(
     mut commands: Commands,
-    origin_query: Query<(Entity, &Transform, &YOrigin), Or<(Changed<Transform>, Changed<YOrigin>)>>,
+    origin_query: Query<
+        (Entity, &GlobalTransform, &YOrigin),
+        Or<(Changed<Transform>, Changed<YOrigin>)>,
+    >,
 ) {
     for (entity, transform, origin) in origin_query.iter() {
-        let order = -(origin.0 + transform.translation.y) / 10_000.;
+        let order = -(origin.0 + transform.translation().y) / 10_000.;
         commands.entity(entity).insert(ZOrder(order));
     }
 }

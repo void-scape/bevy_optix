@@ -348,7 +348,11 @@ struct SubPixelPos(Vec3);
 
 fn snap(mut commands: Commands, mut snap: Query<(Entity, &mut Transform), With<PixelSnap>>) {
     for (entity, mut transform) in snap.iter_mut() {
-        let rounded = transform.translation.round();
+        let rounded = transform
+            .translation
+            .xy()
+            .round()
+            .extend(transform.translation.z);
         commands
             .entity(entity)
             .insert(SubPixelPos(transform.translation));
